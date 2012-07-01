@@ -1,0 +1,102 @@
+
+#ifndef INCLUDE_BLOOM_FILTER_H
+#define INCLUDE_BLOOM_FILTER_H
+
+#include "util.h"
+#include "prefix.h"
+
+extern schemetype runscheme;
+
+const unsigned int char_size = 0x08;    // 8 bits in 1 char(unsigned)
+
+const unsigned char bit_mask[8] = {
+                                   0x01, //00000001
+                                   0x02, //00000010
+                                   0x04, //00000100
+                                   0x08, //00001000
+                                   0x10, //00010000
+                                   0x20, //00100000
+                                   0x40, //01000000
+                                   0x80  //10000000
+                                 };
+
+class bloom_filter
+{
+
+public:
+
+  /*bloom_filter(long unsigned int tbl_size, long unsigned int elem_size, unsigned int fun_size) {
+    bloom_filter_init(tbl_size, elem_size, fun_size);
+    }*/
+
+  bloom_filter() {hash_table = NULL;}
+  
+  void bloom_filter_init(long unsigned int tbl_size, long unsigned int elem_size, unsigned int fun_size) {
+    table_size = tbl_size;
+    //cout << " bloom_filter_init: table size " << tbl_size << endl;
+    element_size = elem_size;
+    if (elem_size == 0) {
+      function_size = 0;
+      hash_table = NULL;
+      return;
+    }
+    function_size = (long unsigned int)(tbl_size/elem_size * 0.7);//fun_size;
+    if (function_size == 0) function_size = 1;
+    hash_table = (unsigned char*) malloc(char_size * (table_size/8+1));
+    unsigned int i;
+    for(i = 0; i < table_size/8+1; ++i) hash_table[i] = 0;
+    //cout << "function size " << function_size << endl;
+  }
+
+
+   ~bloom_filter()
+   {
+     if (hash_table) free(hash_table);
+   }
+
+   int myrand() {
+     return rand();
+   }
+
+   void insert(const prefix & p)
+   {
+     //cout << "insert p " << p << endl;
+     if (runscheme == SCHEME_PFXLEN_EACH_OUT) 
+             srand(p.addr);
+     else srand((unsigned int)(p.addr*exp2(6)+p.len));
+      for(unsigned int i = 0; i < function_size; i++) {
+        long unsigned int hash =  (long unsigned int) (rand()/(double)RAND_MAX * table_size);
+        //cout << hash << endl;
+         hash_table[hash / char_size] |= bit_mask[hash % char_size];
+      }
+   }
+
+   bool contains(const prefix& p)
+   {
+     if (!hash_table) return false;
+     //cout << "check p " << p << endl;
+     if (runscheme == SCHEME_PFXLEN_EACH_OUT) 
+             srand(p.addr);
+     else srand((unsigned int)(p.addr*exp2(6)+p.len));
+      for (unsigned int i = 0; i < function_size; i++)
+      {
+        long unsigned int hash = (long unsigned int)(myrand()/(double)RAND_MAX * table_size);
+         unsigned int bit  = hash % char_size;
+         //cout << hash << endl;
+         if ((hash_table[hash / char_size] & bit_mask[bit]) != bit_mask[bit]) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+private:
+
+   unsigned char*               hash_table;
+   long unsigned int                 table_size; //m bits array
+   long unsigned int                 element_size; //n elements
+   unsigned int                 function_size; //k functions
+
+};
+
+#endif
